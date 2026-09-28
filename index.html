@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Locals Calendar Builder</title>
+  <meta name="description" content="Turn the Pokémon locals schedule into an .ics file for Google Calendar.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='14' fill='%23fff' stroke='%23222' stroke-width='3'/%3E%3Cpath d='M2 16a14 14 0 0 1 28 0z' fill='%23e3350d' stroke='%23222' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='4.5' fill='%23fff' stroke='%23222' stroke-width='3'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="masthead">
+    <div class="wrap">
+      <h1>Locals Calendar Builder</h1>
+      <p>Paste the Pokémon locals schedule, check the store locations, review what changed, and download an <code>.ics</code> for Google Calendar.</p>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <section class="card" id="step-paste">
+      <h2><span class="num">1</span> Paste the schedule</h2>
+      <textarea id="schedule" spellcheck="false" rows="12" aria-label="Schedule text"
+        placeholder="Locals Schedule Updated 9/27&#10;This Week!&#10;10/3 12:00pm Chal @ PsychoTurtle (Pico Rivera)&#10;&#10;October&#10;— 10/10-11 Louisville Regionals —&#10;10/10 12:00pm Chal @ The Collector's Kut (Downey)&#10;…"></textarea>
+      <div class="actions">
+        <button class="primary" id="read-btn" type="button">Read schedule</button>
+        <span class="muted" id="parse-summary" role="status"></span>
+      </div>
+      <div id="parse-notes"></div>
+
+      <details class="settings">
+        <summary>Settings</summary>
+        <div class="grid">
+          <label>Calendar name <input id="set-calName" type="text"></label>
+          <label>League Challenge length (hours) <input id="set-challengeHours" type="number" min="0.5" max="24" step="0.5"></label>
+          <label>League Cup length (hours) <input id="set-cupHours" type="number" min="0.5" max="24" step="0.5"></label>
+          <label>State for store lookups <input id="set-region" type="text" maxlength="20"></label>
+          <label class="check wide"><input id="set-includeNotes" type="checkbox"> Add note lines such as “— 10/10-11 Louisville Regionals —” as all-day events</label>
+        </div>
+        <h3>Publish to GitHub <span class="muted">(optional)</span></h3>
+        <p class="muted small">Commits <code>calendar.ics</code> and <code>venues.json</code> to this site’s repo, so every device compares against the same last calendar and Google Calendar can subscribe to it. Use a <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">fine-grained token</a> limited to this one repo with <em>Contents: Read and write</em>.</p>
+        <div class="grid">
+          <label>Owner <input id="set-ghOwner" type="text" autocomplete="off"></label>
+          <label>Repository <input id="set-ghRepo" type="text" autocomplete="off"></label>
+          <label>Branch <input id="set-ghBranch" type="text" autocomplete="off"></label>
+          <label>Token <input id="gh-token" type="password" autocomplete="off" placeholder="github_pat_…"></label>
+          <label class="check wide"><input id="gh-remember" type="checkbox"> Remember the token in this browser</label>
+        </div>
+      </details>
+    </section>
+
+    <section class="card" id="step-venues" hidden>
+      <h2><span class="num">2</span> Confirm locations</h2>
+      <p class="muted" id="venue-summary"></p>
+      <div class="venues-layout">
+        <div class="map-wrap"><div id="map" aria-label="Map of stores"></div></div>
+        <div id="venue-list"></div>
+      </div>
+    </section>
+
+    <section class="card" id="step-diff" hidden>
+      <h2><span class="num">3</span> Changes since the last calendar</h2>
+      <div class="baseline">
+        <label for="baseline-select">Compare with</label>
+        <select id="baseline-select"></select>
+        <label class="filebtn">Open an .ics…<input id="baseline-file" type="file" accept=".ics,text/calendar"></label>
+      </div>
+      <p class="muted small">Tip: you can also drop an <code>.ics</code> file anywhere on this page.</p>
+      <div id="diff"></div>
+    </section>
+
+    <section class="card" id="step-export" hidden>
+      <h2><span class="num">4</span> Confirm &amp; export</h2>
+      <div id="export"></div>
+    </section>
+  </main>
+
+  <footer class="wrap muted small">
+    Store lookups by Esri ArcGIS · Map © OpenStreetMap contributors · Everything runs in your browser.
+  </footer>
+
+  <div class="drop-hint" id="drop-hint" hidden>Drop an .ics to compare against, or a .txt schedule</div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>
