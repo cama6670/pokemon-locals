@@ -157,7 +157,16 @@ button.small, .button.small { padding: 5px 10px; font-size: 13px; }
 .venue-head h3 { margin: 0; font-size: 15px; }
 .venue-head .city { color: var(--muted); font-weight: 400; }
 .venue-head .count { margin-left: auto; font-size: 13px; color: var(--muted); }
-.addr { margin: 8px 0 0; font-size: 14px; display: flex; flex-wrap: wrap; gap: 4px 10px; align-items: baseline; }
+.addr { margin: 8px 0 0; font-size: 14px; }
+/* Store name and address, each on its own line; clicking zooms the map there. */
+button.addr {
+  display: block; width: calc(100% + 12px); margin: 4px -6px 0; padding: 4px 6px;
+  text-align: left; white-space: normal; font-weight: 400; line-height: 1.45;
+  background: none; border: 0; border-radius: 6px; color: inherit; cursor: zoom-in;
+}
+button.addr:hover { background: var(--surface-2); }
+button.addr:hover .street { color: var(--focus); text-decoration: underline; }
+.addr .place, .addr .street { display: block; }
 .addr .place { font-weight: 600; }
 .venue .hint { margin: 6px 0 0; font-size: 13px; color: var(--warn); }
 .venue .hint.bad { color: var(--bad); }
@@ -165,6 +174,7 @@ button.small, .button.small { padding: 5px 10px; font-size: 13px; }
 .venue .search { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .venue .search input { flex: 1 1 220px; }
 .venue-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; margin-top: 10px; }
+.venue-foot .links { display: flex; align-items: center; gap: 14px; font-size: 13px; }
 .venue-foot .link { font-size: 13px; }
 .venue .confirm { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
 .venue .confirm input { width: 18px; height: 18px; accent-color: var(--ok); }

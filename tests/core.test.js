@@ -109,12 +109,13 @@ test('builds a valid calendar with Los Angeles times and locations', () => {
 
 test('remembers store addresses inside the calendar', () => {
   const p = parseSchedule(SAMPLE, { today: TODAY });
-  const venues = venuesMap([['fire-and-dice@northridge', { address: '9036 Tampa Ave, Northridge, CA 91324', lat: 34.2356, lon: -118.5536 }]]);
+  const venues = venuesMap([['fire-and-dice@northridge', { name: 'Fire & Dice Games', address: '9036 Tampa Ave, Northridge, CA 91324', lat: 34.2356, lon: -118.5536 }]]);
   const { text } = build(p, venues);
   const known = venuesFromCalendar(parseICS(text));
   assert.deepEqual([...known.keys()], ['fire-and-dice@northridge']);
   assert.equal(known.get('fire-and-dice@northridge').address, '9036 Tampa Ave, Northridge, CA 91324');
   assert.equal(known.get('fire-and-dice@northridge').name, 'Fire & Dice');
+  assert.equal(known.get('fire-and-dice@northridge').place, 'Fire & Dice Games');
 });
 
 test('diffs against the last calendar: new, changed, removed, past', () => {

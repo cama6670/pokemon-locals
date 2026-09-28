@@ -201,7 +201,7 @@ function eventRecord(e, venue, s) {
     description: `${e.type} at ${place}\n${mapsUrl(location)}\n\nSchedule line: ${e.line}`,
     x: {
       'X-LOCALS-KIND': 'event', 'X-LOCALS-VENUE': e.venue, 'X-LOCALS-CITY': e.city,
-      'X-LOCALS-VENUE-KEY': e.key, 'X-LOCALS-ADDRESS': venue?.address || '',
+      'X-LOCALS-VENUE-KEY': e.key, 'X-LOCALS-ADDRESS': venue?.address || '', 'X-LOCALS-PLACE': venue?.name || '',
     },
     source: e,
   };
@@ -349,7 +349,7 @@ function finishEvent(cur) {
     geo: geo.length === 2 && geo.every(Number.isFinite) ? { lat: geo[0], lon: geo[1] } : null,
     x: {
       kind: text('X-LOCALS-KIND'), venue: text('X-LOCALS-VENUE'), city: text('X-LOCALS-CITY'),
-      venueKey: text('X-LOCALS-VENUE-KEY'), address: text('X-LOCALS-ADDRESS'),
+      venueKey: text('X-LOCALS-VENUE-KEY'), address: text('X-LOCALS-ADDRESS'), place: text('X-LOCALS-PLACE'),
     },
     rawLines: cur.rawLines,
   };
@@ -391,7 +391,7 @@ export function venuesFromCalendar(cal) {
     const { venueKey: key, address } = e.x;
     if (!key || !address) continue;
     out.set(key, {
-      key, name: e.x.venue, city: e.x.city, address,
+      key, name: e.x.venue, city: e.x.city, address, place: e.x.place,
       lat: e.geo?.lat ?? null, lon: e.geo?.lon ?? null, confirmedAt: at,
     });
   }

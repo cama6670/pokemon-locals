@@ -56,7 +56,7 @@ function knownVenues() {
   const consider = v => {
     if (!v?.key || !v.address) return;
     const cur = all.get(v.key);
-    if (!cur || (v.confirmedAt || '') > (cur.confirmedAt || '')) all.set(v.key, v);
+    if (!cur || (v.confirmedAt || '') >= (cur.confirmedAt || '')) all.set(v.key, v);
   };
   for (const b of state.baselines) for (const v of venuesFromCalendar(b.cal).values()) consider(v);
   for (const v of state.sources.repo.values()) consider(v);
@@ -154,7 +154,11 @@ function makeRow(v, known) {
   return {
     key: v.key, name: v.name, city: v.city, count: v.count,
     status: known ? 'known' : 'pending',
-    chosen: known ? { name: '', address: known.address, lat: known.lat, lon: known.lon } : null,
+    chosen: known ? {
+      name: known.place || '', address: known.address, lat: known.lat, lon: known.lon,
+      // Street addresses have numbers; "Anaheim, CA" is only a city.
+      approximate: known.approximate ?? !/\d/.test(known.address),
+    } : null,
     savedAddress: known?.address || null,
     candidates: [],
     confirmed: !!known,
@@ -230,8 +234,8 @@ function venueRowHtml(row) {
   if (busy) return html + '<p class="addr muted">Searching for the store…</p>';
 
   if (c) {
-    html += `<p class="addr">${c.name ? `<span class="place">${esc(c.name)}</span>` : ''}<span>${esc(c.address)}</span>
-      <a href="${esc(mapsUrl(loc))}" target="_blank" rel="noopener">Check on Google Maps ↗</a></p>`;
+    html += `<button type="button" class="addr" data-act="zoom" title="Show on the map">${
+      c.name ? `<span class="place">${esc(c.name)}</span>` : ''}<span class="street">${esc(c.address)}</span></button>`;
   }
   if (row.status === 'approx' || (c?.approximate && (row.status === 'found' || row.status === 'manual'))) {
     html += `<p class="hint">Only the city was found. That’s fine for the calendar (Google Maps will search “${esc(loc)}”), or search for the exact address below.</p>`;
@@ -264,9 +268,10 @@ function venueRowHtml(row) {
       ? '<button type="button" class="link" data-act="revert">Keep saved address</button>'
       : '<button type="button" class="link" data-act="edit">Change location</button>';
   } else if (!showEditor) {
-    tool = '<button type="button" class="link" data-act="edit">Wrong store? Search again</button>';
+    tool = '<button type="button" class="link" data-act="edit">Search again</button>';
   }
-  html += `<div class="venue-foot"><label class="confirm"><input type="checkbox" data-act="confirm"${row.confirmed ? ' checked' : ''}> Location is correct</label>${tool}</div>`;
+  const gmaps = c ? `<a href="${esc(mapsUrl(loc))}" target="_blank" rel="noopener">Google Maps ↗</a>` : '';
+  html += `<div class="venue-foot"><label class="confirm"><input type="checkbox" data-act="confirm"${row.confirmed ? ' checked' : ''}> Location is correct</label><span class="links">${gmaps}${tool}</span></div>`;
   return html;
 }
 
@@ -366,6 +371,7 @@ function onVenueEvent(e) {
     row.message = 'Using your text as the address (no map pin).';
     changed(row);
   }
+  if (act === 'zoom') zoomToRow(row);
   if (act === 'edit') { row.editing = true; renderVenueRow(row); }
   if (act === 'revert') {
     const saved = knownVenues().get(row.key);
@@ -408,6 +414,15 @@ async function searchRow(row, query) {
 // ---------------------------------------------------------------- map
 
 let map = null, layer = null, lastPins = '';
+const markers = new Map(); // venue key → map marker
+
+// How far to zoom for a result: street level for an address, wider for areas.
+function zoomFor(place) {
+  if (place.precise) return 16;
+  if (/neighborhood|postal/i.test(place.kind || '')) return 13;
+  if (/state|province|region/i.test(place.kind || '')) return 6;
+  return 12;
+}
 
 // focusKey: zoom in on that store instead of framing them all.
 function renderMap(focusKey = null) {
@@ -424,6 +439,7 @@ function renderMap(focusKey = null) {
     layer = L.featureGroup().addTo(map);
   }
   layer.clearLayers();
+  markers.clear();
   const styles = getComputedStyle(document.documentElement);
   const ok = styles.getPropertyValue('--ok').trim(), warn = styles.getPropertyValue('--warn').trim();
   let focus = null;
@@ -434,9 +450,10 @@ function renderMap(focusKey = null) {
       radius: c.approximate ? 6 : 8, color: '#fff', weight: 2, fillOpacity: 0.95,
       fillColor: row.confirmed ? ok : warn, dashArray: c.approximate ? '3 3' : null,
     });
-    marker.bindTooltip(`${esc(row.name)} (${esc(row.city)})${c.approximate ? ' — city only' : ''}${row.confirmed ? '' : ' — not confirmed yet'}`);
+    marker.bindTooltip(`${esc(row.name)} (${esc(row.city)})${c.approximate ? ' — city only' : ''}${row.confirmed ? '' : ' — not confirmed yet'}`, { direction: 'top', offset: [0, -8] });
     marker.on('click', () => revealVenue(row.key));
     layer.addLayer(marker);
+    markers.set(row.key, marker);
     if (row.key === focusKey) focus = { marker, zoom: c.approximate ? 12 : 16 };
   }
   // Only re-frame when pins move, so confirming a store doesn't undo your zoom.
@@ -445,12 +462,59 @@ function renderMap(focusKey = null) {
     map.invalidateSize();
     if (focus) {
       map.flyTo(focus.marker.getLatLng(), focus.zoom, { duration: 0.8 });
-      focus.marker.openTooltip();
+      showOnly(focus.marker);
     } else if (pins && pins !== lastPins) {
       map.fitBounds(layer.getBounds().pad(0.15), { maxZoom: 13 });
     }
     lastPins = pins;
   }, 0);
+}
+
+// Label just this store's pin (null: clear every label and popup).
+function showOnly(marker) {
+  map.closePopup();
+  for (const m of markers.values()) if (m !== marker) m.closeTooltip();
+  marker?.openTooltip();
+}
+
+const areaLookups = new Map(); // query → Promise of the best place, so repeat clicks don't re-query
+
+function lookUpArea(query) {
+  if (!areaLookups.has(query)) {
+    areaLookups.set(query, searchPlaces(query).then(found => found.find(p => p.precise) || found[0] || null).catch(() => null));
+  }
+  return areaLookups.get(query);
+}
+
+// Zoom to a store's pin; with no pin, to the closest place we can find:
+// its address text, then its city, then the state.
+async function zoomToRow(row) {
+  if (!map) return;
+  const el = $('#map');
+  const r = el.getBoundingClientRect();
+  if (r.bottom < 0 || r.top > innerHeight) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+
+  const c = row.chosen;
+  const marker = markers.get(row.key);
+  if (marker) {
+    map.flyTo(marker.getLatLng(), c?.approximate ? 12 : 16, { duration: 0.8 });
+    showOnly(marker);
+    return;
+  }
+  const region = state.settings.region;
+  const queries = [...new Set([c?.address, [row.city, region].filter(Boolean).join(', '), region].filter(Boolean))];
+  for (const q of queries) {
+    const place = await lookUpArea(q);
+    if (!place) continue;
+    const where = place.address.toLowerCase().includes(place.name.toLowerCase()) ? place.address : [place.name, place.address].filter(Boolean).join(', ');
+    map.flyTo([place.lat, place.lon], zoomFor(place), { duration: 0.8 });
+    showOnly(null);
+    L.popup({ autoPan: false })
+      .setLatLng([place.lat, place.lon])
+      .setContent(`<strong>${esc(row.name)}</strong><br>No exact pin — showing ${esc(where)}`)
+      .openOn(map);
+    return;
+  }
 }
 
 // ---------------------------------------------------------------- step 3: diff
@@ -593,6 +657,7 @@ function saveVenues(at) {
     const same = prev && prev.address === row.chosen.address;
     saved[row.key] = {
       name: row.name, city: row.city, address: row.chosen.address,
+      place: row.chosen.name || '', approximate: !!row.chosen.approximate,
       lat: Number.isFinite(row.chosen.lat) ? row.chosen.lat : null,
       lon: Number.isFinite(row.chosen.lon) ? row.chosen.lon : null,
       confirmedAt: same && prev.confirmedAt ? prev.confirmedAt : at,
@@ -606,7 +671,10 @@ function venuesJson(at) {
   const all = knownVenues();
   const venues = {};
   for (const [key, v] of [...all.entries()].sort(([a], [b]) => a.localeCompare(b))) {
-    venues[key] = { name: v.name, city: v.city, address: v.address, lat: v.lat ?? null, lon: v.lon ?? null, confirmedAt: v.confirmedAt || at };
+    venues[key] = {
+      name: v.name, city: v.city, address: v.address, place: v.place || '', approximate: v.approximate ?? !/\d/.test(v.address),
+      lat: v.lat ?? null, lon: v.lon ?? null, confirmedAt: v.confirmedAt || at,
+    };
   }
   return JSON.stringify({ updated: at, venues }, null, 2) + '\n';
 }
