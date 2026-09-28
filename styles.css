@@ -133,16 +133,21 @@ button.small, .button.small { padding: 5px 10px; font-size: 13px; }
 
 /* ------------------------------------------------------------ venues */
 
-.venues-layout { display: grid; gap: 16px; grid-template-columns: 1fr; }
+/* The store list scrolls on its own once it's past about five cards. */
+.venues-layout { --list-h: min(760px, calc(100vh - 80px)); display: grid; gap: 16px; grid-template-columns: 1fr; }
 @media (min-width: 900px) {
   .venues-layout { grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); align-items: start; }
-  .map-wrap { position: sticky; top: 12px; order: 2; }
+  .map-wrap { order: 2; }
 }
 #map { height: 300px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface-2); }
-@media (min-width: 900px) { #map { height: 520px; } }
+@media (min-width: 900px) { #map { height: var(--list-h); } }
 .map-fallback { display: grid; place-items: center; height: 100%; color: var(--muted); font-size: 14px; padding: 16px; text-align: center; }
 
-#venue-list { display: grid; gap: 10px; }
+#venue-list {
+  position: relative; display: grid; gap: 10px; align-content: start;
+  max-height: var(--list-h); overflow-y: auto; overscroll-behavior: contain;
+  padding: 2px 6px 2px 2px; margin: -2px -6px -2px -2px;
+}
 .venue { border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; background: var(--surface); scroll-margin-top: 16px; }
 .venue.needs { border-color: var(--warn); box-shadow: inset 3px 0 0 var(--warn); }
 .venue.ok { box-shadow: inset 3px 0 0 var(--ok); }
@@ -159,9 +164,10 @@ button.small, .button.small { padding: 5px 10px; font-size: 13px; }
 .venue .cand { margin-top: 8px; }
 .venue .search { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
 .venue .search input { flex: 1 1 220px; }
-.venue .confirm { display: flex; align-items: center; gap: 8px; margin-top: 10px; font-weight: 600; font-size: 14px; }
+.venue-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; margin-top: 10px; }
+.venue-foot .link { font-size: 13px; }
+.venue .confirm { display: flex; align-items: center; gap: 8px; font-weight: 600; font-size: 14px; }
 .venue .confirm input { width: 18px; height: 18px; accent-color: var(--ok); }
-.venue-tools { display: flex; gap: 12px; margin-top: 6px; font-size: 13px; }
 
 .pill { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--surface-2); color: var(--muted); }
 .pill.known { background: var(--ok-soft); color: var(--ok); }

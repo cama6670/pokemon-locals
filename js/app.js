@@ -258,14 +258,15 @@ function venueRowHtml(row) {
       <button type="button" class="small" data-act="use-typed" title="Use exactly what you typed as the address">Use as typed</button>
     </div>`;
   }
+  let tool = '';
   if (row.status === 'known') {
-    html += `<div class="venue-tools">${row.editing
-      ? `<button type="button" class="link" data-act="revert">Keep saved address</button>`
-      : `<button type="button" class="link" data-act="edit">Change location</button>`}</div>`;
+    tool = row.editing
+      ? '<button type="button" class="link" data-act="revert">Keep saved address</button>'
+      : '<button type="button" class="link" data-act="edit">Change location</button>';
   } else if (!showEditor) {
-    html += `<div class="venue-tools"><button type="button" class="link" data-act="edit">Wrong store? Search again</button></div>`;
+    tool = '<button type="button" class="link" data-act="edit">Wrong store? Search again</button>';
   }
-  html += `<label class="confirm"><input type="checkbox" data-act="confirm"${row.confirmed ? ' checked' : ''}> Location is correct</label>`;
+  html += `<div class="venue-foot"><label class="confirm"><input type="checkbox" data-act="confirm"${row.confirmed ? ' checked' : ''}> Location is correct</label>${tool}</div>`;
   return html;
 }
 
@@ -286,11 +287,24 @@ function renderVenueRow(row) {
 const cssId = key => key.replace(/[^a-z0-9-]/gi, '_');
 
 function renderVenues() {
-  $('#venue-list').innerHTML = '';
+  const list = $('#venue-list');
+  const scroll = list.scrollTop;
+  list.innerHTML = '';
   // New stores first, so they're what you see.
   const rows = [...state.rows.values()].sort((a, b) => (a.status === 'known') - (b.status === 'known'));
   for (const row of rows) renderVenueRow(row);
+  list.scrollTop = scroll;
   renderMap();
+}
+
+// Scroll the store list (not the whole page) to a card and flash it.
+function revealVenue(key, { page = false } = {}) {
+  const card = document.getElementById(`venue-${cssId(key)}`);
+  if (!card) return;
+  if (page) $('#step-venues').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const list = $('#venue-list');
+  list.scrollTo({ top: card.offsetTop - (list.clientHeight - card.offsetHeight) / 2, behavior: 'smooth' });
+  card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
 }
 
 // Exact name + city matches with nothing to warn about.
@@ -339,7 +353,7 @@ function onVenueEvent(e) {
     if (!c) return;
     row.chosen = c.precise ? pick(c) : { ...fallbackChoice(row), lat: c.lat, lon: c.lon };
     row.message = '';
-    changed(row);
+    changed(row, { focus: true });
     return;
   }
   if (type !== 'click') return;
@@ -356,15 +370,16 @@ function onVenueEvent(e) {
   if (act === 'revert') {
     const saved = knownVenues().get(row.key);
     Object.assign(row, makeRow(row, saved), { count: row.count });
-    changed(row, true);
+    changed(row, { keepConfirmed: true, focus: true });
   }
 }
 
 // Anything that changes a row's location needs a fresh confirmation.
-function changed(row, keepConfirmed = false) {
+// `focus` zooms the map to the row's new spot.
+function changed(row, { keepConfirmed = false, focus = false } = {}) {
   if (!keepConfirmed) row.confirmed = false;
   renderVenueRow(row);
-  renderMap();
+  renderMap(focus ? row.key : null);
   refresh();
 }
 
@@ -387,21 +402,22 @@ async function searchRow(row, query) {
   } catch (err) {
     row.message = `${err.message}. Try again, or use “Use as typed”.`;
   }
-  changed(row);
+  changed(row, { focus: true });
 }
 
 // ---------------------------------------------------------------- map
 
 let map = null, layer = null, lastPins = '';
 
-function renderMap() {
+// focusKey: zoom in on that store instead of framing them all.
+function renderMap(focusKey = null) {
   const el = $('#map');
   if (!window.L) {
     el.innerHTML = '<div class="map-fallback">Map unavailable (couldn’t load the map library). Use the Google Maps links instead.</div>';
     return;
   }
   if (!map) {
-    map = L.map(el, { scrollWheelZoom: false }).setView([34.0, -117.9], 8);
+    map = L.map(el).setView([34.0, -117.9], 8);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 18, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
     }).addTo(map);
@@ -410,6 +426,7 @@ function renderMap() {
   layer.clearLayers();
   const styles = getComputedStyle(document.documentElement);
   const ok = styles.getPropertyValue('--ok').trim(), warn = styles.getPropertyValue('--warn').trim();
+  let focus = null;
   for (const row of state.rows.values()) {
     const c = row.chosen;
     if (!c || !Number.isFinite(c.lat) || !Number.isFinite(c.lon)) continue;
@@ -418,19 +435,20 @@ function renderMap() {
       fillColor: row.confirmed ? ok : warn, dashArray: c.approximate ? '3 3' : null,
     });
     marker.bindTooltip(`${esc(row.name)} (${esc(row.city)})${c.approximate ? ' — city only' : ''}${row.confirmed ? '' : ' — not confirmed yet'}`);
-    marker.on('click', () => {
-      const card = document.getElementById(`venue-${cssId(row.key)}`);
-      if (!card) return;
-      card.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      card.classList.remove('flash'); void card.offsetWidth; card.classList.add('flash');
-    });
+    marker.on('click', () => revealVenue(row.key));
     layer.addLayer(marker);
+    if (row.key === focusKey) focus = { marker, zoom: c.approximate ? 12 : 16 };
   }
   // Only re-frame when pins move, so confirming a store doesn't undo your zoom.
   const pins = layer.getLayers().map(m => m.getLatLng().toString()).sort().join('|');
   setTimeout(() => {
     map.invalidateSize();
-    if (pins && pins !== lastPins) map.fitBounds(layer.getBounds().pad(0.15), { maxZoom: 13 });
+    if (focus) {
+      map.flyTo(focus.marker.getLatLng(), focus.zoom, { duration: 0.8 });
+      focus.marker.openTooltip();
+    } else if (pins && pins !== lastPins) {
+      map.fitBounds(layer.getBounds().pad(0.15), { maxZoom: 13 });
+    }
     lastPins = pins;
   }, 0);
 }
@@ -752,7 +770,7 @@ async function init() {
     }
     if (e.target.dataset.act === 'goto-open') {
       const row = [...state.rows.values()].find(r => !r.confirmed);
-      document.getElementById(`venue-${cssId(row?.key || '')}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (row) revealVenue(row.key, { page: true });
     }
   });
 
