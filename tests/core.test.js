@@ -9,7 +9,7 @@ import { tidyAddress } from '../js/geocode.js';
 
 const SAMPLE = readFileSync(new URL('../sample-schedule.txt', import.meta.url), 'utf8');
 const TODAY = new Date('2026-09-27T19:00:00Z');
-const SETTINGS = { calName: 'Pokémon Locals', challengeHours: 4, cupHours: 6, region: 'CA', includeNotes: true };
+const SETTINGS = { calName: 'Pokémon Locals', eventHours: 3, region: 'CA', includeNotes: true };
 
 const venuesMap = entries => new Map(entries);
 const build = (parsed, venues = new Map(), prev = [], now = TODAY, keep = []) => {
@@ -84,17 +84,21 @@ test('builds a valid calendar with Los Angeles times and locations', () => {
   assert.equal(ev.summary, 'League Challenge @ PsychoTurtle (Pico Rivera)');
   assert.equal(ev.location, 'PsychoTurtle, 9547 Telegraph Rd, Pico Rivera, CA 90660');
   assert.equal(ev.startCanon, '2026-10-03T19:00:00Z', 'noon PDT is 19:00 UTC');
-  assert.equal(ev.endCanon, '2026-10-03T23:00:00Z', '4 hour challenge');
+  assert.equal(ev.endCanon, '2026-10-03T22:00:00Z', '3 hour event');
   assert.deepEqual(ev.geo, { lat: 33.954466, lon: -118.09939 });
 
   const cup = cal.events.find(e => e.uid.startsWith('20261128-the-collectors-kut'));
   assert.equal(cup.startCanon, '2026-11-28T20:00:00Z', 'noon PST (after DST ends) is 20:00 UTC');
-  assert.equal(cup.endCanon, '2026-11-29T02:00:00Z', '6 hour cup');
+  assert.equal(cup.endCanon, '2026-11-28T23:00:00Z', 'cups are 3 hours too');
   assert.equal(cup.location, "The Collector's Kut, Downey, CA", 'falls back to name + city');
 
   const note = cal.events.find(e => e.uid.includes('-note-'));
   assert.equal(note.startCanon, '2026-10-10');
   assert.equal(note.endCanon, '2026-10-12', 'all-day end is exclusive');
+
+  for (const r of records.filter(r => r.kind === 'event')) {
+    assert.equal(Date.parse(r.endCanon) - Date.parse(r.startCanon), 3 * 3600000, `${r.uid} is 3 hours`);
+  }
 
   // Round trip: every record reads back identically.
   for (const r of records) {
@@ -153,7 +157,7 @@ test('an unchanged schedule produces no changes on the second run', () => {
 });
 
 test('reads calendars exported with UTC times (e.g. from Google)', () => {
-  const ics = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:20261003-psychoturtle-pico-rivera@pokemon-locals-ical\r\nDTSTART:20261003T190000Z\r\nDTEND:20261003T230000Z\r\nSUMMARY:League Challenge @ PsychoTurtle (Pico Rivera)\r\nLOCATION:PsychoTurtle\\, Pico Rivera\\, CA\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n';
+  const ics = 'BEGIN:VCALENDAR\r\nBEGIN:VEVENT\r\nUID:20261003-psychoturtle-pico-rivera@pokemon-locals-ical\r\nDTSTART:20261003T190000Z\r\nDTEND:20261003T220000Z\r\nSUMMARY:League Challenge @ PsychoTurtle (Pico Rivera)\r\nLOCATION:PsychoTurtle\\, Pico Rivera\\, CA\r\nEND:VEVENT\r\nEND:VCALENDAR\r\n';
   const p = parseSchedule('10/3 12:00pm Chal @ PsychoTurtle (Pico Rivera)', { today: TODAY });
   const { diff } = build(p, new Map(), parseICS(ics).events);
   assert.equal(diff.unchanged.length, 1);

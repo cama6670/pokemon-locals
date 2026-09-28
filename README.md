@@ -54,8 +54,8 @@ own every several hours, including removals.
 
 ## Notes
 
-- Times are Pacific (`America/Los_Angeles`). League Challenges default to 4
-  hours and League Cups to 6; both can be changed in Settings.
+- Times are Pacific (`America/Los_Angeles`). Every event is 3 hours long
+  (change it in Settings); note lines like Regionals are all-day events.
 - The schedule doesn't include a year, so each date gets the year closest to
   the "Updated" date (a December schedule's January events land in the next year).
 - Store lookups use Esri's public ArcGIS geocoder, which knows most game stores

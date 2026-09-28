@@ -23,7 +23,7 @@ const store = {
 };
 const K = { settings: 'locals.settings', venues: 'locals.venues', lastCal: 'locals.lastCalendar', draft: 'locals.scheduleDraft', token: 'locals.ghToken' };
 
-const DEFAULTS = { calName: 'Pokémon Locals', challengeHours: 4, cupHours: 6, region: 'CA', includeNotes: true, ghOwner: '', ghRepo: '', ghBranch: 'main' };
+const DEFAULTS = { calName: 'Pokémon Locals', eventHours: 3, region: 'CA', includeNotes: true, ghOwner: '', ghRepo: '', ghBranch: 'main' };
 
 function loadSettings() {
   const saved = store.get(K.settings, {});

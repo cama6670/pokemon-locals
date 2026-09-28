@@ -186,8 +186,8 @@ export function locationText(e, venue, region) {
 }
 
 function eventRecord(e, venue, s) {
-  const hours = /\bcup\b/i.test(e.type) ? +s.cupHours : +s.challengeHours;
-  const end = shift(e, Math.round((hours > 0 ? hours : 4) * 60));
+  const hours = +s.eventHours > 0 ? +s.eventHours : 3;
+  const end = shift(e, Math.round(hours * 60));
   const place = `${e.venue}${e.city ? ` (${e.city})` : ''}`;
   const location = locationText(e, venue, s.region);
   const hasGeo = venue && Number.isFinite(venue.lat) && Number.isFinite(venue.lon);
